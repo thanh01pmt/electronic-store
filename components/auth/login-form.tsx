@@ -15,6 +15,8 @@ import { createClient } from "@/lib/utils/supabase-client";
 import { Field, Form, Formik } from "formik";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Button } from "@/components/ui/button";
+import { FcGoogle } from "react-icons/fc";
 
 export function LoginForm() {
 	const [isLoading, startTransition] = useTransition();
@@ -42,6 +44,22 @@ export function LoginForm() {
 				router.refresh();
 			} catch (err: unknown) {
 				handleAuthError(err, "LOGIN FAULT");
+			}
+		});
+	}
+
+	function handleGoogleSignIn() {
+		startTransition(async () => {
+			try {
+				const { error } = await supabase.auth.signInWithOAuth({
+					provider: "google",
+					options: {
+						redirectTo: `${window.location.origin}/auth/callback`,
+					},
+				});
+				if (error) throw error;
+			} catch (err: unknown) {
+				handleAuthError(err, "GOOGLE SIGNIN FAULT");
 			}
 		});
 	}
@@ -93,6 +111,24 @@ export function LoginForm() {
 						type="submit"
 						className="w-full"
 					/>
+					<div className="relative my-4">
+						<div className="absolute inset-0 flex items-center">
+							<span className="w-full border-t border-muted-foreground/20" />
+						</div>
+						<div className="relative flex justify-center text-xs uppercase">
+							<span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+						</div>
+					</div>
+					<Button
+						type="button"
+						variant="outline"
+						className="w-full flex items-center justify-center gap-2"
+						onClick={handleGoogleSignIn}
+						disabled={isLoading}
+					>
+						<FcGoogle className="h-5 w-5" />
+						Sign in with Google
+					</Button>
 				</Form>
 			)}
 		</Formik>
