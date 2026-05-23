@@ -77,8 +77,8 @@ export default function UploadBomPage() {
 						<a
 							className="underline"
 							href="/bom_template.csv"
-							download={"Circuit_parts_bom_template"}>
-							Download Circuit Parts BOM Template
+							download={"ele_store_bom_template"}>
+							Download ELE Store BOM Template
 						</a>
 					</span>
 				</li>

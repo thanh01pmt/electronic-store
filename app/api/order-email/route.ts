@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 		const data = await resend.emails.send({
 			from: UPDATES_NOTIFICATION_EMAIL,
 			to: [order.billingAddress.email],
-			subject: `Circuit Parts Order Confirmation: ${order.id}`,
+			subject: `ELE Store Order Confirmation: ${order.id}`,
 			react: OrderConfirmationEmailTemplate(order),
 		});
 		return Response.json(data);

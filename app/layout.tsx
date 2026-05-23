@@ -15,7 +15,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
 	metadataBase: new URL(env.NEXT_PUBLIC_APP_URL || "https://localhost:3000"),
-	title: "Circuit Parts | Open-source E-Commerce shopping platform for embedded electronics",
+	title: "ELE Store | Open-source E-Commerce shopping platform for embedded electronics",
 	description: "Open-source E-Commerce shopping platform for embedded electronics",
 	icons: [{ rel: "icon", url: "/favicon.ico" }],
 	authors: [
@@ -24,13 +24,13 @@ export const metadata: Metadata = {
 			url: "https://www.consolelogs.in",
 		},
 	],
-	creator: "Circuit Parts",
+	creator: "ELE Store",
 	openGraph: {
-		title: "Circuit Parts | Open-source E-Commerce shopping platform for embedded electronics",
+		title: "ELE Store | Open-source E-Commerce shopping platform for embedded electronics",
 		description: "Open-source E-Commerce shopping platform for embedded electronics",
-		url: "https://www.circuitparts.in",
+		url: "https://ele-store.netlify.app",
 		locale: "en_US",
-		siteName: "Circuit Parts",
+		siteName: "ELE Store",
 		type: "website",
 	},
 };

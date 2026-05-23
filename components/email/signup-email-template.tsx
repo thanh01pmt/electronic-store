@@ -29,7 +29,7 @@ export function SignupEmailTemplate(firstName: string) {
 			<p>
 				In case you have any questions, feel free to contact us using any of the channels on our{" "}
 				<a
-					href="https://www.circuitparts.in/contact-us"
+					href="https://ele-store.netlify.app/contact-us"
 					style={{
 						color: "#007BFF",
 						textDecoration: "none",
@@ -39,7 +39,7 @@ export function SignupEmailTemplate(firstName: string) {
 				or you can also reply to this email and one of our team members will get back to you.
 			</p>
 			<p>Best,</p>
-			<p>Circuit Parts Team</p>
+			<p>ELE Store Team</p>
 			<p
 				style={{
 					borderTop: "1px solid #ddd",
@@ -47,7 +47,7 @@ export function SignupEmailTemplate(firstName: string) {
 					fontSize: "0.8rem",
 					color: "#777",
 				}}>
-				&copy; {new Date().getFullYear()} Circuit Parts. All rights reserved.
+				&copy; {new Date().getFullYear()} ELE Store. All rights reserved.
 			</p>
 		</div>
 	);

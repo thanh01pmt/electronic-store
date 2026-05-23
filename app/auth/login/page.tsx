@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
 	title: `Login | ${PLATFORM_NAME}`,
-	description: "Login to your Circuit Parts Account",
+	description: "Login to your ELE Store Account",
 };
 
 export default function Login() {

@@ -16,7 +16,7 @@ export default function Signup() {
 			<Card className="w-full sm:w-96 sm:mx-auto">
 				<CardHeader className="space-y-1 text-center">
 					<CardTitle className="text-2xl">Create an account</CardTitle>
-					<CardDescription>Signup for your circuit parts account</CardDescription>
+					<CardDescription>Signup for your ELE Store account</CardDescription>
 				</CardHeader>
 				<CardContent className="grid gap-4">
 					<SignupForm />

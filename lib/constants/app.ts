@@ -1,6 +1,6 @@
 import { env } from "@/env";
 
-export const PLATFORM_NAME = "Circuit Parts";
+export const PLATFORM_NAME = "ELE Store";
 export const PLATFORM_DESCRIPTION = "Electronic Components, PCB Fabrication & Assembly, all at one place.";
 export const PLATFORM_ORIGIN_COUNTRY = "India";
 

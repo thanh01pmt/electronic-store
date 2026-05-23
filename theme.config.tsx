@@ -40,9 +40,9 @@ const config: DocsThemeConfig = {
 			<span>
 				© {new Date().getFullYear()}{" "}
 				<a
-					href="https://www.circuitparts.in"
+					href="https://ele-store.netlify.app"
 					target="_blank">
-					Circuit Parts
+					ELE Store
 				</a>
 				.
 			</span>
