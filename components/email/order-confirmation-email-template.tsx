@@ -39,7 +39,7 @@ export function OrderConfirmationEmailTemplate(order: OrderType) {
 				or you can also reply to this email and one of our team members will get back to you.
 			</p>
 			<p>Best,</p>
-			<p>ELE Store Team</p>
+			<p>VICHIP Electronics Team</p>
 			<p
 				style={{
 					borderTop: "1px solid #ddd",
@@ -47,7 +47,7 @@ export function OrderConfirmationEmailTemplate(order: OrderType) {
 					fontSize: "0.8rem",
 					color: "#777",
 				}}>
-				&copy; {new Date().getFullYear()} ELE Store. All rights reserved.
+				&copy; {new Date().getFullYear()} VICHIP Electronics. All rights reserved.
 			</p>
 		</div>
 	);

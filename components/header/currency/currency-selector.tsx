@@ -17,6 +17,7 @@ import {
 	GBP_CURR_CODE,
 	INR_CURR_CODE,
 	USD_CURR_CODE,
+	VND_CURR_CODE
 } from "@/lib/constants/app";
 import type { CurrencyType } from "@/types/currency-types";
 import AustraliaFlag from "@/public/images/flags/australia.png";
@@ -24,6 +25,7 @@ import EuropeanUnionFlag from "@/public/images/flags/european-union.png";
 import IndiaFlag from "@/public/images/flags/india.png";
 import UnitedKingdomFlag from "@/public/images/flags/united-kingdom.png";
 import UnitedStatesFlag from "@/public/images/flags/united-states.png";
+import VietnamFlag from "@/public/images/flags/vietnam.png";
 import { useContext } from "react";
 
 const currenyFlagMapping = {
@@ -32,6 +34,7 @@ const currenyFlagMapping = {
 	[EUR_CURR_CODE]: { id: 3, flag: EuropeanUnionFlag, country: "European Union" },
 	[GBP_CURR_CODE]: { id: 4, flag: UnitedKingdomFlag, country: "United Kingdom" },
 	[AUD_CURR_CODE]: { id: 5, flag: AustraliaFlag, country: "Australia" },
+	[VND_CURR_CODE]: { id: 6, flag: VietnamFlag, country: "Vietnam" }
 };
 
 export function CurrencySelector() {

@@ -1,7 +1,8 @@
 import { env } from "@/env";
 
-export const PLATFORM_NAME = "ELE Store";
-export const PLATFORM_DESCRIPTION = "Electronic Components, PCB Fabrication & Assembly, all at one place.";
+export const PLATFORM_NAME = "VICHIP Electronics";
+export const PLATFORM_DESCRIPTION =
+	"Official Components Distributor for Industrial Innovation - IC, MCU, Power, Sensor, Connector, Automation and more.";
 export const PLATFORM_ORIGIN_COUNTRY = "India";
 
 // api endpoints
@@ -15,7 +16,12 @@ export const PCB_ASSEMBLY_API_ENDPOINT = `${PRODUCTS_API_ENDPOINT}/pcb-assembly`
 export const UPDATES_NOTIFICATION_EMAIL = env.NEXT_PUBLIC_UPDATES_EMAIL_ADDR;
 
 // Product constants
-export const PART_OUT_OF_STOCK_STATUSES = ["On Order", "Not Stocked", "Non-Stocked", "None"];
+export const PART_OUT_OF_STOCK_STATUSES = [
+	"On Order",
+	"Not Stocked",
+	"Non-Stocked",
+	"None",
+];
 
 // API status codes
 export const STATUS_OK = 200;
@@ -35,14 +41,23 @@ export const SALES_TAX_PERCENTAGE = 0.07; // 7% sales tax
 export const GST_PERCENTAGE = 0.18; // 18% GST
 
 // Currency codes
+export const VND_CURR_CODE = "vnd";
 export const INR_CURR_CODE = "inr";
 export const USD_CURR_CODE = "usd";
 export const EUR_CURR_CODE = "eur";
 export const GBP_CURR_CODE = "gbp";
 export const AUD_CURR_CODE = "aud";
-export const CURRENCY_CODES = [INR_CURR_CODE, USD_CURR_CODE, EUR_CURR_CODE, GBP_CURR_CODE, AUD_CURR_CODE];
+export const CURRENCY_CODES = [
+	VND_CURR_CODE,
+	INR_CURR_CODE,
+	USD_CURR_CODE,
+	EUR_CURR_CODE,
+	GBP_CURR_CODE,
+	AUD_CURR_CODE,
+];
 
 // Exchange rates
+export const USD_VND_EXCHANGE_RATE = 25400; // 1 USD ≈ 25,400 VND
 export const USD_INR_EXCHANGE_RATE = 83.0; // 1 USD = 83 INR
 export const USD_EUR_EXCHANGE_RATE = 0.91; // 1 USD = 0.91 EUR
 export const USD_GBP_EXCHANGE_RATE = 0.78; // 1 USD = 0.78 GBP
@@ -58,5 +73,3 @@ export const OVERSEAS_PCB_SHIP_FEE = 25; // flat $25
 export const CONSOLE_RED_TEXT = "\x1b[31m%s\x1b[0m";
 export const CONSOLE_GREEN_TEXT = "\x1b[32m%s\x1b[0m";
 export const CONSOLE_YELLOW_TEXT = "\x1b[33m%s\x1b[0m";
-
-

@@ -7,6 +7,7 @@ import { BOM_HELP_PAGE, BOM_PARSER_API_ENDPOINT, SHOPPING_CART_PAGE } from "@/li
 import { addMultiplePartsToCartAction } from "@/lib/server-actions/cart-actions";
 import type { SortedResultsType } from "@/types/part-types";
 import Link from "next/link";
+import { PLATFORM_NAME } from "@/lib/constants/app";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -77,8 +78,8 @@ export default function UploadBomPage() {
 						<a
 							className="underline"
 							href="/bom_template.csv"
-							download={"ele_store_bom_template"}>
-							Download ELE Store BOM Template
+							download={"vichip_electronics_bom_template"}>
+							Tải File Mẫu BOM {PLATFORM_NAME}
 						</a>
 					</span>
 				</li>

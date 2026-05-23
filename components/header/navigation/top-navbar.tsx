@@ -7,10 +7,8 @@ import {
 	NavigationMenuList,
 	navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { PLATFORM_NAME } from "@/lib/constants/app";
+import { VichipLogo } from "@/components/logo";
 import { HOME_PAGE } from "@/lib/constants/page-routes";
-import logo from "@/public/images/logo.png";
-import Image from "next/image";
 import Link from "next/link";
 
 export function TopNavbar() {
@@ -20,13 +18,7 @@ export function TopNavbar() {
 				aria-label="Home"
 				href={HOME_PAGE}
 				className="hidden items-center space-x-2 lg:flex">
-				<Image
-					src={logo}
-					alt="Logo"
-					height={20}
-					width={20}
-				/>
-				<span className="hidden text-xl font-bold lg:inline-block">{PLATFORM_NAME}</span>
+				<VichipLogo />
 			</Link>
 			<NavigationMenu>
 				<NavigationMenuList>

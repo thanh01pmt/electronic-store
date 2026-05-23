@@ -1,1 +1,1 @@
-export type CurrencyType = "usd" | "inr" | "eur" | "gbp" | "aud";
+export type CurrencyType = "vnd" | "usd" | "inr" | "eur" | "gbp" | "aud";

@@ -1,6 +1,6 @@
 import { env } from "@/env";
 import { OrderConfirmationEmailTemplate } from "@/components/email/order-confirmation-email-template";
-import { CONSOLE_RED_TEXT, UPDATES_NOTIFICATION_EMAIL } from "@/lib/constants/app";
+import { CONSOLE_RED_TEXT, UPDATES_NOTIFICATION_EMAIL, PLATFORM_NAME } from "@/lib/constants/app";
 import type { OrderType } from "@/types/order-types";
 import { Resend } from "resend";
 
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 		const data = await resend.emails.send({
 			from: UPDATES_NOTIFICATION_EMAIL,
 			to: [order.billingAddress.email],
-			subject: `ELE Store Order Confirmation: ${order.id}`,
+			subject: `${PLATFORM_NAME} Order Confirmation: ${order.id}`,
 			react: OrderConfirmationEmailTemplate(order),
 		});
 		return Response.json(data);

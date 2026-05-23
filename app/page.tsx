@@ -1,23 +1,21 @@
-import { Features } from "@/components/home/features";
-import { PcbInstantQuote } from "@/components/home/pcb-instant-quote";
-import { SearchHint } from "@/components/home/search-hint";
-import { SearchPartForm } from "@/components/home/search-part-form";
-import { SubTitle } from "@/components/home/subtitle";
-import { Title } from "@/components/home/title";
-import UpcomingFeatures from "@/components/home/upcoming-features";
-import { UploadBomLink } from "@/components/home/upload-bom-link";
+import { Hero } from "@/components/home/hero";
+import { CategoryGrid } from "@/components/home/category-grid";
+import { ValueMetrics } from "@/components/home/value-metrics";
+import { FeaturedProducts } from "@/components/home/featured-products";
+import { WhyVichip } from "@/components/home/why-vichip";
+import { Manufacturers } from "@/components/home/manufacturers";
+import { RfqSection } from "@/components/home/rfq-section";
 
-export default async function Home() {
-	return (
-		<>
-			<Title />
-			<SubTitle />
-			<SearchPartForm />
-			<SearchHint />
-			<UploadBomLink />
-			<PcbInstantQuote />
-			<Features />
-			<UpcomingFeatures />
-		</>
-	);
+export default function Home() {
+  return (
+    <div className="w-full flex flex-col bg-[#F3F5F7] min-h-screen">
+      <Hero />
+      <CategoryGrid />
+      <ValueMetrics />
+      <FeaturedProducts />
+      <WhyVichip />
+      <Manufacturers />
+      <RfqSection />
+    </div>
+  );
 }

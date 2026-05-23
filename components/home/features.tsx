@@ -25,7 +25,7 @@ function FeatureSection() {
 			<div className="lg:max-w-lg">
 				<p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">All-in-one platform</p>
 				<p className="mt-6 leading-8 text-gray-600">
-					ELE Store is a centralised platform for ordering Electronic and Semiconductor Components,
+					VICHIP Electronics is a centralised platform for ordering Electronic and Semiconductor Components,
 					Printed Circuit Board (PCB) fabrication and assembly services.
 				</p>
 				<dl className="mt-10 max-w-xl space-y-8 text-base leading-7 text-gray-600 lg:max-w-none">

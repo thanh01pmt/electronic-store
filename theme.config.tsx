@@ -42,7 +42,7 @@ const config: DocsThemeConfig = {
 				<a
 					href="https://ele-store.netlify.app"
 					target="_blank">
-					ELE Store
+					VICHIP Electronics
 				</a>
 				.
 			</span>

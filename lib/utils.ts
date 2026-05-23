@@ -20,6 +20,8 @@ import {
 	USD_EUR_EXCHANGE_RATE,
 	USD_GBP_EXCHANGE_RATE,
 	USD_INR_EXCHANGE_RATE,
+	USD_VND_EXCHANGE_RATE,
+	VND_CURR_CODE,
 } from "@/lib/constants/app";
 import type { CartDataType } from "@/types/cart-types";
 import type { CurrencyType } from "@/types/currency-types";
@@ -72,6 +74,15 @@ export function formatAmountToINR(amount: number): string {
 		currency: "INR",
 	});
 	const formattedAmount = INR_CURRENCY_FORMATTER.format(amount);
+	return formattedAmount;
+}
+
+export function formatAmountToVND(amount: number): string {
+	const VND_CURRENCY_FORMATTER = new Intl.NumberFormat("vi-VN", {
+		style: "currency",
+		currency: "VND",
+	});
+	const formattedAmount = VND_CURRENCY_FORMATTER.format(amount);
 	return formattedAmount;
 }
 
@@ -161,6 +172,8 @@ export function convertAndFormatInrToUsd(num: number): string {
 
 export function convertToStripeOrderAmount(amount: number, toCurrency: CurrencyType): number {
 	switch (toCurrency) {
+		case VND_CURR_CODE:
+			return Number((amount * USD_VND_EXCHANGE_RATE).toFixed(0)); // Stripe expects VND without cents (zero-decimal)
 		case INR_CURR_CODE:
 			return Number((amount * USD_INR_EXCHANGE_RATE * 100).toFixed(2)); // Stripe expects price in cents
 		case EUR_CURR_CODE:
@@ -180,6 +193,8 @@ export function parsePriceToNumber(price: string): number {
 
 export function formatCurrency(amount: number, toCurrency: CurrencyType): string {
 	switch (toCurrency) {
+		case VND_CURR_CODE:
+			return formatAmountToVND(amount);
 		case INR_CURR_CODE:
 			return formatAmountToINR(amount);
 		case EUR_CURR_CODE:
@@ -204,6 +219,8 @@ export function convertAndFormatCurrencyForOrderHistory(
 
 export function getExchangeRate(currency: CurrencyType): number {
 	switch (currency) {
+		case VND_CURR_CODE:
+			return USD_VND_EXCHANGE_RATE;
 		case INR_CURR_CODE:
 			return USD_INR_EXCHANGE_RATE;
 		case EUR_CURR_CODE:
@@ -365,6 +382,8 @@ export async function apiRequestRateLimiter(requestCount: number, requestsPerMin
 // the default base currency is USD. This needs to be converted to the selected currency.
 export function setExchangeRateForCurrency(currency: CurrencyType): number {
 	switch (currency) {
+		case VND_CURR_CODE:
+			return USD_VND_EXCHANGE_RATE;
 		case INR_CURR_CODE:
 			return USD_INR_EXCHANGE_RATE;
 		case EUR_CURR_CODE:

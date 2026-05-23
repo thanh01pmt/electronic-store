@@ -1,6 +1,6 @@
 "use client";
 import Loading from "@/app/loading";
-import { USD_CURR_CODE } from "@/lib/constants/app";
+import { VND_CURR_CODE } from "@/lib/constants/app";
 import { getCurrencyByIPAddr } from "@/lib/utils";
 import type { CurrencyContextProviderType, CurrencyContextType } from "@/types/context-types";
 import type { CurrencyType } from "@/types/currency-types";
@@ -10,7 +10,7 @@ export const CurrencyContext = createContext({} as CurrencyContextType);
 
 export const CurrencyProvider = ({ children }: CurrencyContextProviderType) => {
 	const [isLoading, setIsLoading] = useState(true);
-	const [currency, setCurrency] = useState<CurrencyType>(USD_CURR_CODE);
+	const [currency, setCurrency] = useState<CurrencyType>(VND_CURR_CODE);
 
 	useEffect(() => {
 		setIsLoading(true);
