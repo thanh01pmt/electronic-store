@@ -1,10 +1,14 @@
+// File: components/auth/signup-form.tsx
+// Implements: specs/auth/spec.md
+// Requirement: Auth Session Validation
+
 "use client";
 import { useHandleAuthError } from "@/components/auth/handle-auth-error";
 import { ButtonWithSpinner } from "@/components/ui/button-with-spinner";
 import { ShowPasswordButton } from "@/components/ui/show-password-button";
 import { VERIFY_EMAIL_PAGE } from "@/lib/constants/page-routes";
 import { signupSchema } from "@/lib/schema/yup-schema";
-import { useSignUp } from "@clerk/nextjs";
+import { createClient } from "@/lib/utils/supabase-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Field, Form, Formik } from "formik";
@@ -13,7 +17,7 @@ import { useState, useTransition } from "react";
 
 export function SignupForm() {
 	const router = useRouter();
-	const { isLoaded, signUp } = useSignUp();
+	const supabase = createClient();
 	const [isLoading, startTransition] = useTransition();
 	const handleAuthError = useHandleAuthError();
 	const [isPasswordVisible, setIsShowPassword] = useState(false);
@@ -27,18 +31,24 @@ export function SignupForm() {
 
 	function handleOnSubmit(signupCredentials: typeof initialValues) {
 		startTransition(async () => {
-			if (!isLoaded) return;
 			try {
-				await signUp.create({
-					emailAddress: signupCredentials.email,
+				const { error } = await supabase.auth.signUp({
+					email: signupCredentials.email,
 					password: signupCredentials.password,
-					firstName: signupCredentials.fname,
-					lastName: signupCredentials.lname,
+					options: {
+						data: {
+							first_name: signupCredentials.fname,
+							last_name: signupCredentials.lname,
+							// Maintain compatibility with existing code calling user.firstName / lastName
+							firstName: signupCredentials.fname,
+							lastName: signupCredentials.lname,
+						},
+					},
 				});
-				// Send email verification code
-				await signUp.prepareEmailAddressVerification({
-					strategy: "email_code",
-				});
+				if (error) throw error;
+
+				// Save email to sessionStorage for the subsequent OTP verify step
+				sessionStorage.setItem("signup_email", signupCredentials.email);
 				router.push(VERIFY_EMAIL_PAGE);
 			} catch (err: unknown) {
 				handleAuthError(err, "SIGNUP FAULT");

@@ -1,12 +1,19 @@
+// File: components/account/user-info.tsx
+// Implements: specs/auth/spec.md
+// Requirement: Auth Session Validation
+
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import { currentUser } from "@clerk/nextjs";
+import { createClient } from "@/lib/utils/supabase-server";
 
 export async function UserInfo() {
-	const user = await currentUser();
+	const supabase = createClient();
+	const { data: { user } } = await supabase.auth.getUser();
 	if (!user) return null;
-	const email = user.emailAddresses[0]?.emailAddress;
-	const fname = user.firstName;
-	const lname = user.lastName;
+
+	const email = user.email;
+	const metadata = user.user_metadata as Record<string, string> | undefined;
+	const fname = metadata?.first_name ?? metadata?.firstName ?? "";
+	const lname = metadata?.last_name ?? metadata?.lastName ?? "";
 
 	return (
 		<Table>

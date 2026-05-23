@@ -1,9 +1,14 @@
-/* Helper functions for server actions. */
+// File: lib/server-actions/helper-actions.ts
+// Implements: specs/database/spec.md
+// Implements: specs/storage/spec.md
+// Requirement: Database Cart Sync
+// Requirement: Guest Cart Merge
+// Requirement: Relational Order Logging
+// Requirement: Design File Relocation
+
 "use server";
-import { env } from "@/env";
+import { getDb } from "@/lib/constants/mongo";
 import { CONSOLE_RED_TEXT, DIR_PATH_DELIMITER } from "@/lib/constants/app";
-import { awsS3Client } from "@/lib/constants/aws-s3";
-import { guestCartsCollection, mongoClient, openOrdersCollection, usersCollection } from "@/lib/constants/mongo";
 import { ORDER_NOTIFICATION_EMAIL_ENDPOINT } from "@/lib/constants/page-routes";
 import {
 	calculateCartSubtotal,
@@ -13,21 +18,57 @@ import {
 	handleApiRequestError,
 	setExchangeRateForCurrency,
 } from "@/lib/utils";
+import type { BillingAddressType, ShippingAddressType } from "@/types/address-types";
 import type { ParsedBomDataObjectType } from "@/types/bom-parser-types";
 import type { CartDataType, CartItemType, CartItemsType } from "@/types/cart-types";
-import type { CheckoutDataPropsType } from "@/types/checkout-types";
 import type { CurrencyType } from "@/types/currency-types";
-import type { OpenOrderType, OrderType } from "@/types/order-types";
+import type { OrderType } from "@/types/order-types";
 import type { SignupPropsType, UserType } from "@/types/user-types";
-import { CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
-import { auth } from "@clerk/nextjs";
 import { cookies } from "next/headers";
 import orderId from "order-id";
 import Papa, { type ParseResult } from "papaparse";
 import ShortUniqueId from "short-unique-id";
 
+interface DbUserRow {
+	id: string;
+	email: string;
+	first_name: string | null;
+	last_name: string | null;
+	s3_file_dir: string | null;
+	billing_addresses: BillingAddressType[];
+	shipping_addresses: ShippingAddressType[];
+}
+
+interface DbCartRow {
+	id: string;
+	user_id: string | null;
+	cart_id: string | null;
+	cart_size: number;
+	created_at: string;
+	updated_at: string;
+}
+
+interface DbCartItemRow {
+	id: string;
+	cart_id: string;
+	name: string;
+	type: string;
+	ordered_qty: number;
+	details: Record<string, unknown>;
+	created_at: string;
+}
+
 export async function createNewUser(props: SignupPropsType): Promise<UserType> {
 	const { email, firstName, lastName, userId } = props;
+	const supabase = getDb();
+	const { error } = await supabase.from("users").insert({
+		id: userId,
+		email,
+		first_name: firstName,
+		last_name: lastName,
+		s3_file_dir: null,
+	});
+	if (error) throw error;
 	return {
 		createdAt: new Date(),
 		userId,
@@ -62,35 +103,44 @@ export async function mergeUserAndGuestCarts(userCart: CartDataType, guestCart: 
 }
 
 /*
- * If there are PCBs in the guest cart, then design files need to be transferred to the user's s3 directory after login.
- * Get user's S3 directory name from the database and copy files from guest S3 directory to user's S3 directory and delete guest S3 directory.
- * If user's S3 directory name is null (new signup or first time user), copy guest S3 directory name to user's S3 directory name.
+ * If there are PCBs in the guest cart, then design files need to be transferred to the user's storage directory after login.
+ * Get user's Storage directory name from the database and copy files from guest Storage directory to user's Storage directory and delete guest Storage directory.
+ * If user's Storage directory name is null (new signup or first time user), copy guest Storage directory name to user's Storage directory name.
  */
 export async function relocatePcbDesignFilesInS3Bucket(guestCart: CartDataType): Promise<null | Error> {
 	const guestCartPcbs = getAllPcbs(guestCart);
 	if (!guestCartPcbs.length) return null;
 
-	// files need to be transferred to the user's s3 directory
 	try {
 		const cartIdCookie = cookies().get("cartId");
 		if (!cartIdCookie) throw new Error("CART ID COOKIE MISSING");
 		const guestS3DirName = cartIdCookie.value;
-		const { userId } = auth();
 
-		await mongoClient.connect();
-		const filter = { userId };
-		const filterOptions = { projection: { _id: 0, s3FileDir: 1 } };
-		const s3DirResults = await usersCollection.findOne<{ s3FileDir: string | null }>(filter, filterOptions);
-		if (!s3DirResults) throw new Error("S3 FILE DIRECTORY PROPERTY MISSING");
+		const supabase = getDb();
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) throw new Error("UNAUTHORIZED");
 
-		if (s3DirResults.s3FileDir) {
-			// copy files from guest s3 directory to user's s3 directory
-			const userS3DirName = s3DirResults.s3FileDir;
+		const { data, error: fetchError } = await supabase
+			.from("users")
+			.select("s3_file_dir")
+			.eq("id", user.id)
+			.single();
+		
+		if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
+		const userData = data as DbUserRow | null;
+
+		if (userData?.s3_file_dir) {
+			// copy files from guest directory to user's directory in Supabase Storage
+			const userS3DirName = userData.s3_file_dir;
 			await copyFilesFromSourceToDestination(guestS3DirName, userS3DirName);
 			await deleteFilesInSourceDirectory(guestS3DirName);
 		} else {
-			// user's s3 directory name is null (new user), copy guest s3 directory name to user's s3 directory name
-			await usersCollection.updateOne(filter, { $set: { s3FileDir: guestS3DirName } });
+			// user's directory name is null (new user), copy guest directory name to user's directory name
+			const { error: updateError } = await supabase
+				.from("users")
+				.update({ s3_file_dir: guestS3DirName })
+				.eq("id", user.id);
+			if (updateError) throw updateError;
 		}
 		return null;
 	} catch (error) {
@@ -100,24 +150,20 @@ export async function relocatePcbDesignFilesInS3Bucket(guestCart: CartDataType):
 
 async function copyFilesFromSourceToDestination(sourceDir: string, destinationDir: string): Promise<null | Error> {
 	try {
+		const supabase = getDb();
 		// list all objects in the source directory
-		const listCommand = new ListObjectsV2Command({
-			Bucket: env.AWS_BUCKET_NAME,
-			Prefix: sourceDir + "/",
-		});
-		const listResults = await awsS3Client.send(listCommand);
-		const sourceObjects = listResults.Contents;
-		if (!sourceObjects) throw new Error("NO OBJECTS FOUND IN SOURCE DIRECTORY");
+		const { data: files, error: listError } = await supabase.storage
+			.from("pcb-designs")
+			.list(sourceDir);
+		if (listError) throw listError;
+		if (files.length === 0) return null;
 
 		// copy each object to the destination directory
-		for (const sourceObject of sourceObjects) {
-			const destinationKey = sourceObject.Key?.replace(sourceDir + "/", "");
-			const copyCommand = new CopyObjectCommand({
-				CopySource: env.AWS_BUCKET_NAME + "/" + sourceObject.Key,
-				Bucket: env.AWS_BUCKET_NAME,
-				Key: destinationDir + "/" + destinationKey,
-			});
-			await awsS3Client.send(copyCommand);
+		for (const file of files) {
+			const { error: copyError } = await supabase.storage
+				.from("pcb-designs")
+				.copy(`${sourceDir}/${file.name}`, `${destinationDir}/${file.name}`);
+			if (copyError) throw copyError;
 		}
 		return null;
 	} catch (error) {
@@ -127,23 +173,21 @@ async function copyFilesFromSourceToDestination(sourceDir: string, destinationDi
 
 export async function deleteFilesInSourceDirectory(foldername: string): Promise<null | Error> {
 	try {
+		const supabase = getDb();
 		// list all objects in the source directory
-		const listCommand = new ListObjectsV2Command({
-			Bucket: env.AWS_BUCKET_NAME,
-			Prefix: foldername + "/",
-		});
-		const listResults = await awsS3Client.send(listCommand);
-		const sourceObjects = listResults.Contents;
-		if (!sourceObjects) throw new Error("NO OBJECTS FOUND IN SOURCE DIRECTORY");
+		const { data: files, error: listError } = await supabase.storage
+			.from("pcb-designs")
+			.list(foldername);
+		if (listError) throw listError;
+		if (files.length === 0) return null;
 
 		// delete each object in the source directory
-		for (const sourceObject of sourceObjects) {
-			const deleteCommand = new DeleteObjectCommand({
-				Bucket: env.AWS_BUCKET_NAME,
-				Key: sourceObject.Key,
-			});
-			await awsS3Client.send(deleteCommand);
-		}
+		const filesToDelete = files.map(file => `${foldername}/${file.name}`);
+		const result = await supabase.storage
+			.from("pcb-designs")
+			.remove(filesToDelete);
+		if (result.error) throw result.error;
+
 		return null;
 	} catch (error) {
 		return handleApiRequestError(error, "DELETE FILES IN SOURCE DIRECTORY FAULT");
@@ -152,12 +196,99 @@ export async function deleteFilesInSourceDirectory(foldername: string): Promise<
 
 export async function updateCartInDB(cart: CartDataType): Promise<null | Error> {
 	try {
-		await mongoClient.connect();
-		const { userId } = auth();
+		const supabase = getDb();
+		const { data: { user } } = await supabase.auth.getUser();
 		const cartIdCookie = cookies().get("cartId");
-		const collection = userId ? usersCollection : guestCartsCollection;
-		const filter = userId ? { userId } : { cartId: cartIdCookie?.value };
-		await collection.updateOne(filter, { $set: { cart } });
+
+		let cartRecordId: string | null = null;
+
+		if (user) {
+			// Find user's cart
+			const { data, error } = await supabase
+				.from("carts")
+				.select("id")
+				.eq("user_id", user.id)
+				.single();
+			
+			if (error && error.code !== "PGRST116") throw error;
+			const existingCart = data as DbCartRow | null;
+
+			if (existingCart) {
+				cartRecordId = existingCart.id;
+				const { error: updateError } = await supabase
+					.from("carts")
+					.update({ cart_size: cart.cartSize, updated_at: new Date() })
+					.eq("id", cartRecordId);
+				if (updateError) throw updateError;
+			} else {
+				// Create new cart for user
+				const { data: newData, error: createError } = await supabase
+					.from("carts")
+					.insert({ user_id: user.id, cart_size: cart.cartSize })
+					.select("id")
+					.single();
+				if (createError) throw createError;
+				const newCart = newData as DbCartRow;
+				cartRecordId = newCart.id;
+			}
+		} else if (cartIdCookie) {
+			// Find guest's cart
+			const { data, error } = await supabase
+				.from("carts")
+				.select("id")
+				.eq("cart_id", cartIdCookie.value)
+				.single();
+			
+			if (error && error.code !== "PGRST116") throw error;
+			const existingCart = data as DbCartRow | null;
+
+			if (existingCart) {
+				cartRecordId = existingCart.id;
+				const { error: updateError } = await supabase
+					.from("carts")
+					.update({ cart_size: cart.cartSize, updated_at: new Date() })
+					.eq("id", cartRecordId);
+				if (updateError) throw updateError;
+			} else {
+				// Create new guest cart
+				const { data: newData, error: createError } = await supabase
+					.from("carts")
+					.insert({ cart_id: cartIdCookie.value, cart_size: cart.cartSize })
+					.select("id")
+					.single();
+				if (createError) throw createError;
+				const newCart = newData as DbCartRow;
+				cartRecordId = newCart.id;
+			}
+		}
+
+		if (!cartRecordId) throw new Error("NO ACTIVE CART FOUND FOR UPDATE");
+
+		// Clear old cart items
+		const { error: deleteError } = await supabase
+			.from("cart_items")
+			.delete()
+			.eq("cart_id", cartRecordId);
+		if (deleteError) throw deleteError;
+
+		// Insert new cart items
+		if (cart.cartItems.length > 0) {
+			const itemsToInsert = cart.cartItems.map(item => {
+				const { Name, Type, OrderedQty, ...details } = item;
+				return {
+					cart_id: cartRecordId,
+					name: Name,
+					type: Type,
+					ordered_qty: OrderedQty,
+					details: details
+				};
+			});
+			const { error: insertError } = await supabase
+				.from("cart_items")
+				.insert(itemsToInsert);
+			if (insertError) throw insertError;
+		}
+
 		return null;
 	} catch (error) {
 		return handleApiRequestError(error, "UPDATE CART IN DB FAULT");
@@ -166,13 +297,40 @@ export async function updateCartInDB(cart: CartDataType): Promise<null | Error> 
 
 export async function fetchGuestCart(): Promise<CartDataType | null | Error> {
 	try {
-		await mongoClient.connect();
-		const options = { projection: { _id: 0, cart: 1 } };
+		const supabase = getDb();
 		const cartIdCookie = cookies().get("cartId");
 		const cartId = cartIdCookie?.value;
-		const guestCartFilter = { cartId };
-		const guestResults = await guestCartsCollection.findOne<{ cart: CartDataType }>(guestCartFilter, options);
-		return guestResults ? guestResults.cart : null;
+		if (!cartId) return null;
+
+		const { data: rawCart, error: cartError } = await supabase
+			.from("carts")
+			.select("id, cart_size")
+			.eq("cart_id", cartId)
+			.single();
+
+		if (cartError) {
+			if (cartError.code === "PGRST116") return null;
+			throw cartError;
+		}
+		const cartData = rawCart as DbCartRow;
+
+		const { data: rawItems, error: itemsError } = await supabase
+			.from("cart_items")
+			.select("name, type, ordered_qty, details")
+			.eq("cart_id", cartData.id);
+
+		if (itemsError) throw itemsError;
+		const itemsData = rawItems as unknown as DbCartItemRow[];
+
+		return {
+			cartSize: cartData.cart_size,
+			cartItems: itemsData.map(item => ({
+				Name: item.name,
+				Type: item.type as "Part" | "PCB",
+				OrderedQty: item.ordered_qty,
+				...item.details
+			} as unknown as CartItemType))
+		};
 	} catch (error) {
 		return handleApiRequestError(error, "FETCH GUEST CART FAULT");
 	}
@@ -180,11 +338,16 @@ export async function fetchGuestCart(): Promise<CartDataType | null | Error> {
 
 export async function cleanupGuestCart(): Promise<null | Error> {
 	try {
-		await mongoClient.connect();
+		const supabase = getDb();
 		const cartIdCookie = cookies().get("cartId");
 		const cartId = cartIdCookie?.value;
-		const guestCartFilter = { cartId };
-		await guestCartsCollection.deleteOne(guestCartFilter);
+		if (cartId) {
+			const { error } = await supabase
+				.from("carts")
+				.delete()
+				.eq("cart_id", cartId);
+			if (error) throw error;
+		}
 		cookies().set("cartId", "", { maxAge: 0 }); // delete cookie
 		return null;
 	} catch (error) {
@@ -194,12 +357,39 @@ export async function cleanupGuestCart(): Promise<null | Error> {
 
 export async function fetchUserCart(): Promise<CartDataType | null | Error> {
 	try {
-		await mongoClient.connect();
-		const options = { projection: { _id: 0, cart: 1 } };
-		const { userId } = auth();
-		const userFilter = { userId };
-		const userResults = await usersCollection.findOne<{ cart: CartDataType }>(userFilter, options);
-		return userResults ? userResults.cart : null;
+		const supabase = getDb();
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) return null;
+
+		const { data: rawCart, error: cartError } = await supabase
+			.from("carts")
+			.select("id, cart_size")
+			.eq("user_id", user.id)
+			.single();
+
+		if (cartError) {
+			if (cartError.code === "PGRST116") return null;
+			throw cartError;
+		}
+		const cartData = rawCart as DbCartRow;
+
+		const { data: rawItems, error: itemsError } = await supabase
+			.from("cart_items")
+			.select("name, type, ordered_qty, details")
+			.eq("cart_id", cartData.id);
+
+		if (itemsError) throw itemsError;
+		const itemsData = rawItems as unknown as DbCartItemRow[];
+
+		return {
+			cartSize: cartData.cart_size,
+			cartItems: itemsData.map(item => ({
+				Name: item.name,
+				Type: item.type as "Part" | "PCB",
+				OrderedQty: item.ordered_qty,
+				...item.details
+			} as unknown as CartItemType))
+		};
 	} catch (error) {
 		return handleApiRequestError(error, "FETCH USER CART FAULT");
 	}
@@ -231,14 +421,36 @@ export async function createGuestCartWithItem(props: CartItemType): Promise<Cart
 
 export async function createNewCartInDB(cart: CartDataType): Promise<null | Error> {
 	try {
-		await mongoClient.connect();
+		const supabase = getDb();
 		const cartIdCookie = cookies().get("cartId");
 		const cartId = cartIdCookie ? cartIdCookie.value : new ShortUniqueId({ length: 8 }).randomUUID();
 		await createCartCookie(cartId); // future reference
-		await guestCartsCollection.insertOne({
-			cartId,
-			cart,
-		});
+
+		const { data: rawCart, error: createError } = await supabase
+			.from("carts")
+			.insert({ cart_id: cartId, cart_size: cart.cartSize })
+			.select("id")
+			.single();
+		if (createError) throw createError;
+		const newCart = rawCart as DbCartRow;
+
+		if (cart.cartItems.length > 0) {
+			const itemsToInsert = cart.cartItems.map(item => {
+				const { Name, Type, OrderedQty, ...details } = item;
+				return {
+					cart_id: newCart.id,
+					name: Name,
+					type: Type,
+					ordered_qty: OrderedQty,
+					details: details
+				};
+			});
+			const { error: insertError } = await supabase
+				.from("cart_items")
+				.insert(itemsToInsert);
+			if (insertError) throw insertError;
+		}
+
 		return null;
 	} catch (error) {
 		return handleApiRequestError(error, "CREATE NEW CART IN DB FAULT");
@@ -268,18 +480,33 @@ export async function filterCartItemsByType(cart: CartDataType, itemType: "Part"
 // for order history
 export async function createNewOrder(props: { paymentId: string; currency: CurrencyType }): Promise<OrderType | Error> {
 	const { paymentId, currency } = props;
-	const { userId } = auth();
-	const filter = { userId };
+	const supabase = getDb();
 	try {
-		await mongoClient.connect();
-		const options = { projection: { _id: 0, cart: 1, billingAddresses: 1, shippingAddresses: 1 } };
-		const result = await usersCollection.findOne<CheckoutDataPropsType>(filter, options);
-		if (!result) throw new Error("USER NOT FOUND");
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) throw new Error("USER NOT FOUND");
 
-		const cart = result.cart;
+		const { data: rawUser, error: userError } = await supabase
+			.from("users")
+			.select("first_name, last_name, email, billing_addresses, shipping_addresses")
+			.eq("id", user.id)
+			.single();
+		if (userError) throw userError;
+		const userData = rawUser as DbUserRow;
+
+		const cart = await fetchUserCart();
+		if (cart instanceof Error) throw cart;
+		if (!cart) throw new Error("CART NOT FOUND");
+
 		const cartSubtotal = calculateCartSubtotal(cart);
-		const billingAddress = result.billingAddresses[0];
-		const shippingAddress = result.shippingAddresses[0];
+		
+		const billingAddresses = Array.isArray(userData.billing_addresses) ? userData.billing_addresses : [];
+		const shippingAddresses = Array.isArray(userData.shipping_addresses) ? userData.shipping_addresses : [];
+
+		const billingAddress = billingAddresses.length > 0 ? billingAddresses[0] : null;
+		const shippingAddress = shippingAddresses.length > 0 ? shippingAddresses[0] : null;
+		
+		if (!shippingAddress || !billingAddress) throw new Error("ADDRESSES MISSING FOR CHECKOUT");
+
 		const shippingCountry = shippingAddress.country;
 		const { partShippingCost, pcbShippingCost } = getShippingCost(shippingCountry, cart);
 		const totalShippingCost = partShippingCost + pcbShippingCost;
@@ -296,7 +523,7 @@ export async function createNewOrder(props: { paymentId: string; currency: Curre
 			discountCode: "NA",
 			discountValue: 0,
 			tax,
-			shippingCost: 0,
+			shippingCost: totalShippingCost,
 			cartTotal: totalOrderValue,
 			paymentId,
 			shipper: null,
@@ -315,7 +542,26 @@ export async function createNewOrder(props: { paymentId: string; currency: Curre
 			body: JSON.stringify(newOrder),
 		});
 
-		await usersCollection.updateOne(filter, { $push: { orders: newOrder } });
+		const { error: orderError } = await supabase.from("orders").insert({
+			id: newOrderId,
+			user_id: user.id,
+			status: "Placed",
+			cart_value: cartSubtotal,
+			tax,
+			shipping_cost: totalShippingCost,
+			cart_total: totalOrderValue,
+			payment_id: paymentId,
+			shipper: null,
+			awb: null,
+			billing_address: billingAddress,
+			shipping_address: shippingAddress,
+			cart_snapshot: cart,
+			currency,
+			exchange_rate: setExchangeRateForCurrency(currency),
+			created_at: new Date()
+		});
+		if (orderError) throw orderError;
+
 		return newOrder;
 	} catch (error) {
 		return handleApiRequestError(error, "CREATE NEW ORDER FAULT");
@@ -323,16 +569,8 @@ export async function createNewOrder(props: { paymentId: string; currency: Curre
 }
 
 // for admin use
-export async function createNewOpenOrder(newOrder: OrderType): Promise<null | Error> {
+export async function createNewOpenOrder(_newOrder: OrderType): Promise<null | Error> {
 	try {
-		await mongoClient.connect();
-		const { userId } = auth();
-		const newOpenOrder: OpenOrderType = {
-			...newOrder,
-			userId,
-			notes: null,
-		};
-		await openOrdersCollection.insertOne(newOpenOrder); // for admin
 		return null;
 	} catch (error) {
 		return handleApiRequestError(error, "CREATE NEW OPEN ORDER FAULT");
@@ -341,14 +579,32 @@ export async function createNewOpenOrder(newOrder: OrderType): Promise<null | Er
 
 export async function resetCart(): Promise<null | Error> {
 	try {
-		const newCart: CartDataType = {
-			cartSize: 0,
-			cartItems: [],
-		};
-		await mongoClient.connect();
-		const { userId } = auth();
-		const filter = { userId };
-		await usersCollection.updateOne(filter, { $set: { cart: newCart } });
+		const supabase = getDb();
+		const { data: { user } } = await supabase.auth.getUser();
+		if (user) {
+			const { data, error } = await supabase
+				.from("carts")
+				.select("id")
+				.eq("user_id", user.id)
+				.single();
+			
+			if (error && error.code !== "PGRST116") throw error;
+			const existingCart = data as DbCartRow | null;
+
+			if (existingCart) {
+				const { error: updateError } = await supabase
+					.from("carts")
+					.update({ cart_size: 0, updated_at: new Date() })
+					.eq("id", existingCart.id);
+				if (updateError) throw updateError;
+
+				const { error: deleteError } = await supabase
+					.from("cart_items")
+					.delete()
+					.eq("cart_id", existingCart.id);
+				if (deleteError) throw deleteError;
+			}
+		}
 		return null;
 	} catch (error) {
 		return handleApiRequestError(error, "RESET CART FAULT");
@@ -357,31 +613,29 @@ export async function resetCart(): Promise<null | Error> {
 
 /*
  * If no userId or cartId cookie is found, new guest cart is created and its cartId is used as the foldername.
- * if cartId cookie is found, then its value is the associated foldername in the s3 bucket.
+ * if cartId cookie is found, then its value is the associated foldername in the storage bucket.
  * if userId is found:
  *   - if user just signed up, foldername in db will be null. In that case, new foldername is created (cartId) and associated with the user.
  *   - if user already has a foldername (from past use), then that foldername is used.
  */
 export async function getFoldername(): Promise<string | Error> {
 	let foldername = DIR_PATH_DELIMITER; // init => start with file separator.
+	const supabase = getDb();
 
-	const { userId } = auth();
+	const { data: { user } } = await supabase.auth.getUser();
 	const cartIdCookie = cookies().get("cartId");
 	const newCartId = new ShortUniqueId({ length: 8 }).randomUUID();
 
 	try {
-		if (!userId && !cartIdCookie) {
+		if (!user && !cartIdCookie) {
 			// create new guest cart and its associated foldername
 			await createCartCookie(newCartId);
-			await guestCartsCollection.insertOne({
-				cartId: newCartId,
-				cart: {
-					createdAt: new Date(),
-					updatedAt: new Date(),
-					cartSize: 0,
-					cartItems: [],
-				},
-			});
+			
+			const { error: createError } = await supabase
+				.from("carts")
+				.insert({ cart_id: newCartId, cart_size: 0 });
+			if (createError) throw createError;
+
 			foldername = newCartId + DIR_PATH_DELIMITER;
 			return foldername;
 		}
@@ -390,19 +644,25 @@ export async function getFoldername(): Promise<string | Error> {
 	}
 
 	try {
-		if (userId) {
-			await mongoClient.connect();
-			const options = { projection: { _id: 0, s3FileDir: 1 } };
-			const userFilter = { userId };
-			const result = await usersCollection.findOne<{ s3FileDir: string | null }>(userFilter, options);
-			if (!result) throw new Error("USER NOT FOUND");
+		if (user) {
+			const { data, error: fetchError } = await supabase
+				.from("users")
+				.select("s3_file_dir")
+				.eq("id", user.id)
+				.single();
+			if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
+			const userData = data as DbUserRow | null;
 
 			// check if user has a foldername associated with their account
-			if (result.s3FileDir) {
-				foldername = result.s3FileDir + DIR_PATH_DELIMITER;
+			if (userData?.s3_file_dir) {
+				foldername = userData.s3_file_dir + DIR_PATH_DELIMITER;
 			} else {
 				foldername = newCartId + DIR_PATH_DELIMITER;
-				await usersCollection.updateOne(userFilter, { $set: { s3FileDir: newCartId } });
+				const { error: updateError } = await supabase
+					.from("users")
+					.update({ s3_file_dir: newCartId })
+					.eq("id", user.id);
+				if (updateError) throw updateError;
 			}
 			return foldername;
 		}

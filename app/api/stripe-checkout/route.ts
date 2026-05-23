@@ -1,6 +1,11 @@
+// File: app/api/stripe-checkout/route.ts
+// Implements: specs/database/spec.md
+// Requirement: Relational Order Logging
+
 import { env } from "@/env";
 import { CONSOLE_RED_TEXT, STATUS_BAD_REQUEST, STATUS_INTERNAL_SERVER_ERROR, STATUS_OK } from "@/lib/constants/app";
-import { mongoClient, usersCollection } from "@/lib/constants/mongo";
+import { getDb } from "@/lib/constants/mongo";
+import { fetchUserCart } from "@/lib/server-actions/helper-actions";
 import {
 	calculateCartSubtotal,
 	calculateSalesTax,
@@ -9,10 +14,17 @@ import {
 	convertToStripeOrderAmount,
 	getShippingCost,
 } from "@/lib/utils";
+import type { BillingAddressType, ShippingAddressType } from "@/types/address-types";
 import type { CurrencyType } from "@/types/currency-types";
-import type { UserType } from "@/types/user-types";
-import { auth } from "@clerk/nextjs";
 import Stripe from "stripe";
+
+interface DbUserRow {
+	first_name: string | null;
+	last_name: string | null;
+	email: string;
+	billing_addresses: BillingAddressType[];
+	shipping_addresses: ShippingAddressType[];
+}
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
@@ -20,37 +32,53 @@ export async function POST(request: Request) {
 	const { currency } = (await request.json()) as { currency: CurrencyType | null };
 	if (!currency) return new Response(null, { status: STATUS_BAD_REQUEST, statusText: "No currency provided" });
 
-	// format currency
 	const formattedCurrency = currency.toLowerCase();
 
 	try {
-		// Fetch data
-		await mongoClient.connect();
-		const { userId } = auth();
-		const userFilter = { userId };
-		const userData = await usersCollection.findOne<UserType>(userFilter);
-		if (!userData) {
-			throw new Error("User not found");
+		const supabase = getDb();
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) {
+			return new Response(null, { status: 401, statusText: "Unauthorized" });
 		}
 
-		const cart = userData.cart;
+		const { data: rawUserData, error: userError } = await supabase
+			.from("users")
+			.select("first_name, last_name, email, billing_addresses, shipping_addresses")
+			.eq("id", user.id)
+			.single();
+		
+		if (userError) throw userError;
+		const userData = rawUserData as unknown as DbUserRow | null;
+		if (!userData) throw new Error("User data not found");
+
+		const cart = await fetchUserCart();
+		if (cart instanceof Error) throw cart;
+		if (!cart) throw new Error("Cart not found");
+
 		const cartValue = calculateCartSubtotal(cart);
 		const partsTotal = calculateTotalPartsCost(cart);
 		const pcbsTotal = calculateTotalPcbsCost(cart);
-		const shippingAddress = userData.shippingAddresses[0];
-		const shippingCountry = shippingAddress.country;
+		
+		const shippingAddresses = Array.isArray(userData.shipping_addresses) ? userData.shipping_addresses : [];
+		const billingAddresses = Array.isArray(userData.billing_addresses) ? userData.billing_addresses : [];
 
+		const shippingAddress = shippingAddresses[0] as ShippingAddressType | undefined;
+		const billingAddress = billingAddresses[0] as BillingAddressType | undefined;
+
+		if (!shippingAddress || !billingAddress) {
+			throw new Error("Addresses missing for checkout");
+		}
+
+		const shippingCountry = shippingAddress.country;
 		const { pcbShippingCost, partShippingCost } = getShippingCost(shippingCountry, cart);
 		const totalShippingCost = partShippingCost + pcbShippingCost;
 
 		const tax = calculateSalesTax(cartValue + totalShippingCost);
 
-		const billingAddress = userData.billingAddresses[0];
-
 		// create stripe customer to prefill data in checkout.
 		const customer = await stripe.customers.create({
 			email: billingAddress.email,
-			name: billingAddress.firstName + " " + billingAddress.lastName,
+			name: (billingAddress.firstName || "") + " " + (billingAddress.lastName || ""),
 			address: {
 				line1: billingAddress.address1,
 				line2: billingAddress.address2,

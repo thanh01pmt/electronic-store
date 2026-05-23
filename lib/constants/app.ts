@@ -59,10 +59,4 @@ export const CONSOLE_RED_TEXT = "\x1b[31m%s\x1b[0m";
 export const CONSOLE_GREEN_TEXT = "\x1b[32m%s\x1b[0m";
 export const CONSOLE_YELLOW_TEXT = "\x1b[33m%s\x1b[0m";
 
-// Database constants
-export const DB_NAME = env.NEXT_PUBLIC_DB_NAME;
-export const DB_COLLECTIONS = {
-	openOrdersCollection: "openOrders", // for admin
-	guestCartsCollection: "guestCarts",
-	usersCollection: "users",
-};
+

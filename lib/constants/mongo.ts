@@ -1,9 +1,10 @@
-import { env } from "@/env";
-import { DB_COLLECTIONS, DB_NAME } from "@/lib/constants/app";
-import { MongoClient } from "mongodb";
+// File: lib/constants/mongo.ts
+// Implements: specs/database/spec.md
+// Requirement: Database Cart Sync
 
-export const mongoClient = new MongoClient(env.MONGODB_URL || "mongodb://localhost:27017/dummy");
-export const database = mongoClient.db(DB_NAME);
-export const usersCollection = database.collection(DB_COLLECTIONS.usersCollection);
-export const guestCartsCollection = database.collection(DB_COLLECTIONS.guestCartsCollection);
-export const openOrdersCollection = database.collection(DB_COLLECTIONS.openOrdersCollection);
+import { createClient } from "@/lib/utils/supabase-server";
+
+// Helper function to get the Supabase Client on the server side
+export function getDb() {
+	return createClient();
+}

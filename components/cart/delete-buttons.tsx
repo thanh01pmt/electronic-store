@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { deleteAllItemsAction, deleteCartItemAction } from "@/lib/server-actions/cart-actions";
-import { deleteAllDesignFilesFromS3, deleteDesignFileFromS3 } from "@/lib/server-actions/s3-actions";
+import { deleteAllDesignFilesFromS3, deleteDesignFileFromS3 } from "@/lib/server-actions/storage-actions";
 import type { DeleteAllCartItemsButtonProps, DeleteCartItemButtonProps } from "@/types/delete-button-types";
 import { useTransition } from "react";
 

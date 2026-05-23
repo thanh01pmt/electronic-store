@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/auth-context";
 import { CurrencyProvider } from "@/context/currency-context";
 import { ReduxProvider } from "@/context/redux-context";
-import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -38,24 +37,22 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
-		<ClerkProvider>
-			<html
-				lang="en"
-				className="h-full">
-				<body className={inter.className}>
-					<AuthProvider>
-						<CurrencyProvider>
-							<ReduxProvider>
-								<Header />
-								<Container>{children}</Container>
-							</ReduxProvider>
-							<Footer />
-						</CurrencyProvider>
-					</AuthProvider>
-					<Toaster />
-					<Analytics />
-				</body>
-			</html>
-		</ClerkProvider>
+		<html
+			lang="en"
+			className="h-full">
+			<body className={inter.className}>
+				<AuthProvider>
+					<CurrencyProvider>
+						<ReduxProvider>
+							<Header />
+							<Container>{children}</Container>
+						</ReduxProvider>
+						<Footer />
+					</CurrencyProvider>
+				</AuthProvider>
+				<Toaster />
+				<Analytics />
+			</body>
+		</html>
 	);
 }

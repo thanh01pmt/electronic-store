@@ -1,26 +1,39 @@
+// File: middleware.ts
+// Implements: specs/auth/spec.md
+// Requirement: Auth Session Validation
+
 import { AUTH_PAGES } from "@/lib/constants/page-routes";
-import { authMiddleware } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { updateSession } from "@/lib/utils/supabase-middleware";
+import { NextResponse, type NextRequest } from "next/server";
 
 const privateRoutes = ["account", "checkout", "order-history", "order-status"];
-const publicRoutesRegExp = new RegExp(`^(?!\/(${privateRoutes.join("|")})).*$`); // Matches any route that doesn't start with /account, /checkout, /order-history, or /order-status
 
-export default authMiddleware({
-	// Public routes are routes that don't require authentication
-	publicRoutes: [publicRoutesRegExp],
-	afterAuth(auth, req) {
-		// redirect to login who aren't authenticated
-		if (!auth.userId && !auth.isPublicRoute) {
-			const login = new URL("/auth/login", req.url);
-			return NextResponse.redirect(login);
-		}
-		if (auth.userId && req.url.includes(AUTH_PAGES)) {
-			// redirect to home if already authenticated
-			const home = new URL("/", req.url);
-			return NextResponse.redirect(home);
-		}
-	},
-});
+export async function middleware(request: NextRequest) {
+	// Update user's Supabase session cookie on request
+	const { supabase, response } = updateSession(request);
+
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+
+	const isPrivateRoute = privateRoutes.some((route) =>
+		request.nextUrl.pathname.startsWith(`/${route}`)
+	);
+
+	// Redirect unauthenticated users trying to access private routes
+	if (!user && isPrivateRoute) {
+		const login = new URL("/auth/login", request.url);
+		return NextResponse.redirect(login);
+	}
+
+	// Redirect authenticated users trying to access auth pages back to home
+	if (user && request.nextUrl.pathname.includes(AUTH_PAGES)) {
+		const home = new URL("/", request.url);
+		return NextResponse.redirect(home);
+	}
+
+	return response;
+}
 
 export const config = {
 	matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api)(.*)"],

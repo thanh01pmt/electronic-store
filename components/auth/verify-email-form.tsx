@@ -1,10 +1,14 @@
+// File: components/auth/verify-email-form.tsx
+// Implements: specs/auth/spec.md
+// Requirement: Auth Session Validation
+
 "use client";
 import { useHandleAuthError } from "@/components/auth/handle-auth-error";
 import { ButtonWithSpinner } from "@/components/ui/button-with-spinner";
 import { HOME_PAGE, SIGNUP_NOTIFICATION_EMAIL_ENDPOINT } from "@/lib/constants/page-routes";
 import { verifyEmailSchema } from "@/lib/schema/yup-schema";
 import { captureUserSignupAction } from "@/lib/server-actions/cart-actions";
-import { useSignUp } from "@clerk/nextjs";
+import { createClient } from "@/lib/utils/supabase-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CONSOLE_RED_TEXT } from "@/lib/constants/app";
@@ -14,7 +18,7 @@ import { useTransition } from "react";
 import type { ClerkSignupDataType } from "@/types/clerk-types";
 
 export function VerifyEmailForm() {
-	const { isLoaded, signUp, setActive } = useSignUp();
+	const supabase = createClient();
 	const router = useRouter();
 	const [isLoading, startTransition] = useTransition();
 	const handleAuthError = useHandleAuthError();
@@ -25,40 +29,33 @@ export function VerifyEmailForm() {
 
 	async function handleOnSubmit(values: typeof initialValues) {
 		startTransition(async () => {
-			if (!isLoaded) return;
+			const email = sessionStorage.getItem("signup_email");
+			if (!email) {
+				handleAuthError(new Error("Email not found. Please sign up again."), "VERIFY EMAIL FAULT");
+				return;
+			}
 
 			try {
-				const completeSignUp = await signUp.attemptEmailAddressVerification({
-					code: values.code,
+				const { data, error } = await supabase.auth.verifyOtp({
+					email,
+					token: values.code,
+					type: "signup",
 				});
 
-				if (completeSignUp.status !== "complete") {
-					console.error(CONSOLE_RED_TEXT, `VERIFY EMAIL FAULT => ${JSON.stringify(completeSignUp, null, 2)}`);
-					return;
+				if (error) throw error;
+				if (!data.user) {
+					throw new Error("Verification succeeded but no user was returned.");
 				}
 
-				await setActive({
-					session: completeSignUp.createdSessionId,
-				});
-
-				if (
-					!completeSignUp.firstName ||
-					!completeSignUp.lastName ||
-					!completeSignUp.emailAddress ||
-					!completeSignUp.createdUserId
-				) {
-					console.error(CONSOLE_RED_TEXT, `VERIFY EMAIL FAULT => ${JSON.stringify(completeSignUp, null, 2)}`);
-					return;
-				}
-
+				const metadata = data.user.user_metadata as Record<string, string> | undefined;
 				const signupData: ClerkSignupDataType = {
-					firstName: completeSignUp.firstName,
-					lastName: completeSignUp.lastName,
-					email: completeSignUp.emailAddress,
-					userId: completeSignUp.createdUserId,
+					firstName: metadata?.first_name ?? metadata?.firstName ?? "",
+					lastName: metadata?.last_name ?? metadata?.lastName ?? "",
+					email: data.user.email ?? "",
+					userId: data.user.id,
 				};
 
-				//TODO: send signup email
+				// Send signup email notification
 				const signupEmail = await fetch(SIGNUP_NOTIFICATION_EMAIL_ENDPOINT, {
 					method: "POST",
 					body: JSON.stringify(signupData),
@@ -76,6 +73,7 @@ export function VerifyEmailForm() {
 				}
 
 				router.push(HOME_PAGE);
+				router.refresh();
 			} catch (err: unknown) {
 				handleAuthError(err, "VERIFY EMAIL FAULT");
 			}
@@ -84,10 +82,18 @@ export function VerifyEmailForm() {
 
 	async function handleResendBtnClick() {
 		startTransition(async () => {
-			if (!isLoaded) return;
-			await signUp.prepareEmailAddressVerification({
-				strategy: "email_code",
+			const email = sessionStorage.getItem("signup_email");
+			if (!email) {
+				handleAuthError(new Error("Email not found. Please sign up again."), "RESEND CODE FAULT");
+				return;
+			}
+			const { error } = await supabase.auth.resend({
+				type: "signup",
+				email,
 			});
+			if (error) {
+				handleAuthError(error, "RESEND CODE FAULT");
+			}
 		});
 	}
 

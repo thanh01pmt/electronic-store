@@ -1,11 +1,11 @@
 import type { CurrencyType } from "@/types/currency-types";
-import type { UserResource } from "@clerk/types";
+import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
 
 export type AuthContextType = {
 	isSignedIn: boolean | undefined;
 	isLoaded: boolean;
-	user: UserResource | undefined | null;
+	user: User | undefined | null;
 };
 
 export type AuthContextProviderType = {

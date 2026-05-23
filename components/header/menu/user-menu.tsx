@@ -1,8 +1,12 @@
+// File: components/header/menu/user-menu.tsx
+// Implements: specs/auth/spec.md
+// Requirement: Auth Session Validation
+
 "use client";
 import { UserAvatar } from "@/components/header/avatar/user-avatar";
 import { AuthContext } from "@/context/auth-context";
 import { ACCOUNT_PAGE, ORDER_HISTORY_PAGE } from "@/lib/constants/page-routes";
-import { useAuth } from "@clerk/nextjs";
+import { createClient } from "@/lib/utils/supabase-client";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -13,10 +17,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useContext } from "react";
+import { useRouter } from "next/navigation";
 
 export function UserMenu() {
 	const { isSignedIn } = useContext(AuthContext);
-	const { signOut } = useAuth();
+	const supabase = createClient();
+	const router = useRouter();
+
+	const handleSignOut = async () => {
+		await supabase.auth.signOut();
+		router.refresh();
+		router.push("/");
+	};
 
 	return (
 		<div hidden={!isSignedIn}>
@@ -32,15 +44,15 @@ export function UserMenu() {
 					</DropdownMenuTrigger>
 
 					<DropdownMenuContent className="w-56">
-						<DropdownMenuItem>
+						<DropdownMenuItem asChild>
 							<Link href={ACCOUNT_PAGE}>Account</Link>
 						</DropdownMenuItem>
-						<DropdownMenuItem>
+						<DropdownMenuItem asChild>
 							<Link href={ORDER_HISTORY_PAGE}>Order History</Link>
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
-							onClick={() => signOut()}
+							onClick={handleSignOut}
 							data-testid="logout-button">
 							Log out
 						</DropdownMenuItem>

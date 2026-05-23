@@ -1,5 +1,10 @@
+// File: lib/server-actions/cart-actions.ts
+// Implements: specs/database/spec.md
+// Requirement: Database Cart Sync
+// Requirement: Guest Cart Merge
+
 "use server";
-import { usersCollection } from "@/lib/constants/mongo";
+import { getDb } from "@/lib/constants/mongo";
 import { HOME_PAGE, PRODUCTS_PAGE, SHOPPING_CART_PAGE } from "@/lib/constants/page-routes";
 import {
 	cleanupGuestCart,
@@ -18,7 +23,6 @@ import {
 import type { UpdatePartQtyPropsType, CartDataType, CartItemType } from "@/types/cart-types";
 import type { PartDataType } from "@/types/part-types";
 import type { SignupPropsType } from "@/types/user-types";
-import { auth } from "@clerk/nextjs";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
@@ -45,7 +49,19 @@ export async function captureUserSignupAction(props: SignupPropsType): Promise<v
 				throw cleanup;
 			}
 		}
-		await usersCollection.insertOne(user);
+
+		// In Supabase, the user is already inserted in users table by createNewUser.
+		// If there was a guest cart transferred, we update the user's cart in the DB.
+		if (guestCart && cartId) {
+			await updateCartInDB(guestCart);
+			const supabase = getDb();
+			const { error: updateError } = await supabase
+				.from("users")
+				.update({ s3_file_dir: cartId })
+				.eq("id", props.userId);
+			if (updateError) throw updateError;
+		}
+
 		revalidatePath(HOME_PAGE, "layout"); // full revalidate
 	} catch (error) {
 		throw error; // handled on the client side.
@@ -63,9 +79,11 @@ export async function transferGuestCartToUserAction(): Promise<void> {
 			const mergedCart = await mergeUserAndGuestCarts(userCart, guestCart);
 			await relocatePcbDesignFilesInS3Bucket(guestCart);
 
-			const { userId } = auth();
-			const userFilter = { userId };
-			await usersCollection.updateOne(userFilter, { $set: { cart: mergedCart } });
+			const supabase = getDb();
+			const { data: { user } } = await supabase.auth.getUser();
+			if (!user) throw new Error("UNAUTHORIZED");
+
+			await updateCartInDB(mergedCart);
 
 			const cleanup = await cleanupGuestCart();
 			if (cleanup instanceof Error) throw cleanup;
@@ -150,8 +168,9 @@ export async function addMultiplePartsToCartAction(items: PartDataType[]): Promi
 
 export async function fetchCartItemsAction(): Promise<CartDataType | null> {
 	try {
-		const { userId } = auth();
-		if (userId) {
+		const supabase = getDb();
+		const { data: { user } } = await supabase.auth.getUser();
+		if (user) {
 			const userCart = await fetchUserCart();
 			if (userCart instanceof Error) throw userCart;
 			return userCart;
