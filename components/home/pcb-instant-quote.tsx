@@ -17,7 +17,7 @@ const tabs = [
 	{
 		id: 1,
 		value: "rigidPcb",
-		label: "Rigid PCB",
+		label: "Mạch in Cứng",
 		href: RIGID_PCB_FAB_PAGE,
 		fields: [
 			<RigidBoardSize key="rigidBoardSize" />,
@@ -28,7 +28,7 @@ const tabs = [
 	{
 		id: 2,
 		value: "flexPcb",
-		label: "Flex PCB",
+		label: "Mạch in Dẻo",
 		href: FLEX_PCB_FAB_PAGE,
 		fields: [
 			<FlexBoardSize key="flexBoardSize" />,
@@ -39,7 +39,7 @@ const tabs = [
 	{
 		id: 3,
 		value: "pcbAssembly",
-		label: "PCB Assembly",
+		label: "Lắp ráp PCB",
 		href: PCB_ASSEMBLY_PAGE,
 		fields: [
 			<AssemblyBoardType key="assemblyBoardType" />,
@@ -76,7 +76,7 @@ export function PcbInstantQuote() {
 								<Button
 									asChild
 									className="mt-6 w-full xl:w-1/2">
-									<Link href={tab.href}>Get Quote</Link>
+									<Link href={tab.href}>Nhận báo giá</Link>
 								</Button>
 							</CardContent>
 						</Card>
