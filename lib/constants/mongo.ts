@@ -2,7 +2,7 @@ import { env } from "@/env";
 import { DB_COLLECTIONS, DB_NAME } from "@/lib/constants/app";
 import { MongoClient } from "mongodb";
 
-export const mongoClient = new MongoClient(env.MONGODB_URL);
+export const mongoClient = new MongoClient(env.MONGODB_URL || "mongodb://localhost:27017/dummy");
 export const database = mongoClient.db(DB_NAME);
 export const usersCollection = database.collection(DB_COLLECTIONS.usersCollection);
 export const guestCartsCollection = database.collection(DB_COLLECTIONS.guestCartsCollection);

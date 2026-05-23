@@ -4,7 +4,7 @@ import { UPDATES_NOTIFICATION_EMAIL } from "@/lib/constants/app";
 import type { ClerkSignupDataType } from "@/types/clerk-types";
 import { Resend } from "resend";
 
-const resend = new Resend(env.RESEND_API_KEY);
+const resend = new Resend(env.RESEND_API_KEY || "re_placeholder_for_build");
 
 export async function POST(request: Request) {
 	const user = (await request.json()) as ClerkSignupDataType;

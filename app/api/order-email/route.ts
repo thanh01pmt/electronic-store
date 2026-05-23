@@ -4,7 +4,7 @@ import { CONSOLE_RED_TEXT, UPDATES_NOTIFICATION_EMAIL } from "@/lib/constants/ap
 import type { OrderType } from "@/types/order-types";
 import { Resend } from "resend";
 
-const resend = new Resend(env.RESEND_API_KEY);
+const resend = new Resend(env.RESEND_API_KEY || "re_placeholder_for_build");
 
 export async function POST(request: Request) {
 	const order = (await request.json()) as OrderType;
