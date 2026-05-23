@@ -15,7 +15,7 @@ export function LoginButton() {
 					size={"sm"}
 					variant={"default"}
 					data-testid="login-button">
-					<Link href={LOGIN_PAGE}>Login</Link>
+					<Link href={LOGIN_PAGE}>Đăng nhập</Link>
 				</Button>
 			</div>
 		</div>

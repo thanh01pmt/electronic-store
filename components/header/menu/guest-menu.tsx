@@ -15,17 +15,17 @@ import { useContext } from "react";
 const guestMenuOptions = [
 	{
 		id: 1,
-		name: "Log In",
+		name: "Đăng nhập",
 		href: LOGIN_PAGE,
 	},
 	{
 		id: 2,
-		name: "Sign Up",
+		name: "Đăng ký",
 		href: SIGNUP_PAGE,
 	},
 	{
 		id: 3,
-		name: "Order History",
+		name: "Lịch sử đơn hàng",
 		href: ORDER_HISTORY_PAGE,
 	},
 ];
